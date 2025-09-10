@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "pyjpki"
+version = "0.1.0"
+description = "A Python module for JPKI (Japanese Public Key Infrastructure) operations on My Number Cards."
+authors = ["Jules"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+pyscard = ">=2.0.0"
+cryptography = ">=3.0.0"
+pyasn1 = ">=0.4.8"
+
+[tool.poetry.dev-dependencies]
+pytest = "^6.2"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
