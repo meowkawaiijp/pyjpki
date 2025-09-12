@@ -2,7 +2,7 @@
 name = "pyjpki"
 version = "0.1.0"
 description = "A Python module for JPKI (Japanese Public Key Infrastructure) operations on My Number Cards."
-authors = ["Jules"]
+authors = ["Meow"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
