@@ -7,7 +7,6 @@ from typing import List, Optional, Tuple
 import hashlib
 import logging
 from typing import List, Optional, Tuple
-
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from pyasn1.type import univ, namedtype, tag
@@ -16,6 +15,7 @@ from smartcard.System import readers
 from smartcard.pcsc.PCSCExceptions import BaseSCardException
 from smartcard.CardConnection import CardConnection
 from smartcard.reader.Reader import Reader
+
 
 from .constants import (
     CLA_ISO7816,
@@ -73,8 +73,28 @@ class CardManager:
             各文字列が接続されたリーダーの名前である文字列のリスト。
         """
         try:
-            return [str(r) for r in readers()]
-        except BaseSCardException:
+            reader_list = readers()
+            if not reader_list:
+                logger.warning("No smart card readers found")
+                return []
+            
+            import platform
+            if platform.system() == "Windows":
+                normalized_readers = []
+                for reader in reader_list:
+                    reader_name = str(reader)
+                    if "\\" in reader_name:
+                        reader_name = reader_name.split("\\")[-1]
+                    normalized_readers.append(reader_name)
+                return normalized_readers
+            else:
+                return [str(r) for r in reader_list]
+                
+        except BaseSCardException as e:
+            logger.error(f"Error getting smart card readers: {e}")
+            return []
+        except Exception as e:
+            logger.error(f"Unexpected error getting smart card readers: {e}")
             return []
 
     def connect(self) -> None:
@@ -85,18 +105,28 @@ class CardManager:
             RuntimeError: リーダーが見つからない場合、または指定されたリーダーインデックスが無効な場合。
             Exception: 接続中にpyscardからの例外を伝播します。
         """
-        reader_list = readers()
-        if not reader_list:
-            raise RuntimeError("No smart card readers found.")
+        try:
+            reader_list = readers()
+            if not reader_list:
+                raise RuntimeError("No smart card readers found.")
 
-        if self.reader_index >= len(reader_list):
-            raise RuntimeError(f"Reader index {self.reader_index} is out of bounds.")
+            if self.reader_index >= len(reader_list):
+                raise RuntimeError(f"Reader index {self.reader_index} is out of bounds.")
 
-        self._reader = reader_list[self.reader_index]
-        logger.debug("Connecting to reader: %s", self._reader)
-        self._connection = self._reader.createConnection()
-        self._connection.connect()
-        logger.info("Connected to card.")
+            self._reader = reader_list[self.reader_index]
+            logger.debug("Connecting to reader: %s", self._reader)
+            self._connection = self._reader.createConnection()
+            
+            self._connection.connect()
+          
+            logger.info("Connected to card.")
+            
+        except BaseSCardException as e:
+            logger.error(f"Smart card connection error: {e}")
+            raise RuntimeError(f"Failed to connect to smart card: {e}")
+        except Exception as e:
+            logger.error(f"Unexpected error during connection: {e}")
+            raise
 
     def disconnect(self) -> None:
         """

@@ -7,11 +7,9 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.8"
-pyscard = ">=2.0.0"
-cryptography = ">=3.0.0"
 pyasn1 = ">=0.4.8"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
 pytest = "^6.2"
 
 [build-system]

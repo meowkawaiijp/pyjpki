@@ -18,10 +18,36 @@
 
 このプロジェクトは依存関係管理に[Poetry](https://python-poetry.org/)を使用しています。
 
-まず、お使いのオペレーティングシステムに必要なPC/SCドライバーがインストールされていることを確認してください。Debian/Ubuntuでは、以下のコマンドで開発ヘッダーをインストールできます：
+### Windows環境でのインストール
+
+Windows環境では、以下の手順でインストールしてください：
+
+1. **PC/SCサービスが有効になっていることを確認**
+   - Windowsのサービスで「Smart Card」サービスが実行中であることを確認してください
+
+2. **pyscardライブラリのインストール**
+   ```bash
+   pip install pyscard
+   ```
+
+3. **pyjpkiのインストール**
+   ```bash
+   pip install .
+   ```
+
+### Linux環境でのインストール
+
+Linux環境では、まずPC/SCドライバーをインストールしてください：
+
+**Debian/Ubuntu:**
 ```bash
 sudo apt-get update
 sudo apt-get install -y libpcsclite-dev
+```
+
+**CentOS/RHEL:**
+```bash
+sudo yum install pcsc-lite-devel
 ```
 
 その後、ライブラリとその依存関係をインストールします：
