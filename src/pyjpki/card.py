@@ -1,6 +1,6 @@
 """
-This module provides classes for managing connections to smart card readers
-and cards using the pyscard library.
+このモジュールは、pyscardライブラリを使用してスマートカードリーダーと
+カードへの接続を管理するクラスを提供します。
 """
 from typing import List, Optional, Tuple
 
@@ -46,18 +46,17 @@ logger = logging.getLogger(__name__)
 
 class CardManager:
     """
-    A class to manage the connection to a smart card.
+    スマートカードへの接続を管理するクラス。
 
-    This class is a context manager that handles the connection and disconnection
-    of a smart card.
+    このクラスは、スマートカードの接続と切断を処理するコンテキストマネージャーです。
     """
 
     def __init__(self, reader_index: int = 0):
         """
-        Initializes the CardManager.
+        CardManagerを初期化します。
 
         Args:
-            reader_index: The index of the reader to use from the list of available readers.
+            reader_index: 利用可能なリーダーリストから使用するリーダーのインデックス。
         """
         self.reader_index = reader_index
         self._reader: Optional[Reader] = None
@@ -68,10 +67,10 @@ class CardManager:
     @staticmethod
     def get_readers() -> List[str]:
         """
-        Gets a list of available smart card reader names.
+        利用可能なスマートカードリーダー名のリストを取得します。
 
         Returns:
-            A list of strings, where each string is the name of a connected reader.
+            各文字列が接続されたリーダーの名前である文字列のリスト。
         """
         try:
             return [str(r) for r in readers()]
@@ -80,11 +79,11 @@ class CardManager:
 
     def connect(self) -> None:
         """
-        Establishes a connection to the smart card in the selected reader.
+        選択されたリーダー内のスマートカードへの接続を確立します。
 
         Raises:
-            RuntimeError: If no readers are found or if the specified reader index is invalid.
-            Exception: Propagates exceptions from pyscard during connection.
+            RuntimeError: リーダーが見つからない場合、または指定されたリーダーインデックスが無効な場合。
+            Exception: 接続中にpyscardからの例外を伝播します。
         """
         reader_list = readers()
         if not reader_list:
@@ -101,7 +100,7 @@ class CardManager:
 
     def disconnect(self) -> None:
         """
-        Disconnects from the smart card.
+        スマートカードから切断します。
         """
         if self._connection:
             self._connection.disconnect()
@@ -112,49 +111,49 @@ class CardManager:
     @property
     def is_connected(self) -> bool:
         """
-        Checks if a connection to a card is active.
+        カードへの接続がアクティブかどうかをチェックします。
 
         Returns:
-            True if connected, False otherwise.
+            接続されている場合はTrue、そうでなければFalse。
         """
         return self._connection is not None
 
     @property
     def connection(self) -> Optional[CardConnection]:
         """
-        Returns the raw pyscard CardConnection object.
+        生のpyscard CardConnectionオブジェクトを返します。
 
         Returns:
-            The CardConnection object if connected, otherwise None.
+            接続されている場合はCardConnectionオブジェクト、そうでなければNone。
         """
         return self._connection
 
     def __enter__(self):
         """
-        Context manager entry point. Connects to the card.
+        コンテキストマネージャーのエントリーポイント。カードに接続します。
         """
         self.connect()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """
-        Context manager exit point. Disconnects from the card.
+        コンテキストマネージャーの終了ポイント。カードから切断します。
         """
         self.disconnect()
 
     def _transmit(self, apdu: List[int]) -> Tuple[List[int], int, int]:
         """
-        Transmits an APDU command and handles basic error checking.
+        APDUコマンドを送信し、基本的なエラーチェックを処理します。
 
         Args:
-            apdu: The APDU command to transmit.
+            apdu: 送信するAPDUコマンド。
 
         Returns:
-            A tuple of (data, sw1, sw2).
+            (data, sw1, sw2)のタプル。
 
         Raises:
-            APDUError: If the transmission fails or the card returns a non-success status word.
-            RuntimeError: If not connected to a card.
+            APDUError: 送信が失敗した場合、またはカードが非成功ステータスワードを返した場合。
+            RuntimeError: カードに接続されていない場合。
         """
         if not self.connection:
             raise RuntimeError("Not connected to a card.")
@@ -164,26 +163,26 @@ class CardManager:
         logger.debug("<-- %s (SW: %02X %02X)", " ".join(f"{b:02X}" for b in data), sw1, sw2)
 
         if (sw1, sw2) != SW_SUCCESS:
-            # Pin verification failures are handled separately
+            # PIN検証失敗は別途処理される
             if sw1 != SW_VERIFY_FAIL_PREFIX:
                 raise APDUError(f"APDU command failed: {apdu}", sw1, sw2)
         return data, sw1, sw2
 
     def verify_pin(self, pin: str, pin_type: str = "auth") -> int:
         """
-        Verifies a PIN against the card.
+        カードに対してPINを検証します。
 
         Args:
-            pin: The PIN to verify.
-            pin_type: The type of PIN to verify. One of 'auth', 'sign', or 'attr'.
+            pin: 検証するPIN。
+            pin_type: 検証するPINのタイプ。'auth'、'sign'、または'attr'のいずれか。
 
         Returns:
-            The number of retries left after a successful verification.
+            成功した検証後に残っているリトライ回数。
 
         Raises:
-            PinVerificationError: If the PIN is incorrect.
-            APDUError: For other card communication errors.
-            ValueError: If an invalid pin_type is provided.
+            PinVerificationError: PINが正しくない場合。
+            APDUError: その他のカード通信エラーの場合。
+            ValueError: 無効なpin_typeが提供された場合。
         """
         if pin_type == "auth":
             df = DF_JPKI
@@ -197,15 +196,15 @@ class CardManager:
         else:
             raise ValueError(f"Invalid pin_type: {pin_type}")
 
-        # 1. Select DF
+        # 1. DFを選択
         apdu = [CLA_ISO7816, INS_SELECT, 0x04, 0x0C, len(df)] + df
         self._transmit(apdu)
 
-        # 2. Select EF (PIN file)
+        # 2. EF（PINファイル）を選択
         apdu = [CLA_ISO7816, INS_SELECT, 0x02, 0x0C, len(ef)] + ef
         self._transmit(apdu)
 
-        # 3. Verify PIN
+        # 3. PINを検証
         pin_bytes = [ord(c) for c in pin]
         apdu = [CLA_ISO7816, INS_VERIFY, 0x00, 0x80, len(pin_bytes)] + pin_bytes
 
@@ -214,7 +213,7 @@ class CardManager:
         data, sw1, sw2 = self.connection.transmit(apdu)
 
         if (sw1, sw2) == SW_SUCCESS:
-            return 3 # Nominal success value, as counter is reset.
+            return 3 # カウンターがリセットされるため、名目上の成功値。
         elif sw1 == SW_VERIFY_FAIL_PREFIX:
             raise PinVerificationError(sw1, sw2)
         else:
@@ -222,7 +221,7 @@ class CardManager:
 
     def read_certificate(self, cert_type: str = "auth") -> x509.Certificate:
         """
-        Reads a certificate from the card.
+        カードから証明書を読み取ります。
         """
         if cert_type in self._cert_cache:
             return self._cert_cache[cert_type]
@@ -249,7 +248,7 @@ class CardManager:
 
     def get_certificate_info(self, cert_type: str = "auth"):
         """
-        Reads a certificate from the card and returns a simplified data structure.
+        カードから証明書を読み取り、簡略化されたデータ構造を返します。
         """
         from .certificate import JPKICertificate
 
@@ -258,7 +257,7 @@ class CardManager:
 
     def sign_data(self, data_to_sign: bytes, sign_type: str = "auth") -> bytes:
         """
-        Signs a hash of the given data using a private key on the card.
+        カード上の秘密鍵を使用して、与えられたデータのハッシュに署名します。
         """
         if sign_type == "auth":
             ef = EF_AUTH_KEY
@@ -308,7 +307,7 @@ class CardManager:
 
     def read_personal_info(self):
         """
-        Reads the 4 basic personal attributes from the card.
+        カードから4つの基本個人属性を読み取ります。
         """
         from .personal_info import JPKIPersonalInfo
 

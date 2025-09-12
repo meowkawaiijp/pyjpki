@@ -1,6 +1,5 @@
 """
-This module provides various utility functions for working with JPKI certificates
-and keys.
+このモジュールは、JPKI証明書とキーを操作するための様々なユーティリティ関数を提供します。
 """
 from datetime import datetime
 
@@ -11,22 +10,22 @@ from cryptography.exceptions import InvalidSignature
 
 def validate_certificate(cert: x509.Certificate, issuer_cert: x509.Certificate = None) -> bool:
     """
-    Validates a certificate's expiration and signature.
+    証明書の有効期限と署名を検証します。
 
     Args:
-        cert: The certificate to validate.
-        issuer_cert: The issuer's certificate. If provided, the signature is verified.
-                     If None, only the expiration date is checked.
+        cert: 検証する証明書。
+        issuer_cert: 発行者証明書。提供された場合、署名が検証されます。
+                      Noneの場合、有効期限のみがチェックされます。
 
     Returns:
-        True if the certificate is valid, False otherwise.
+        証明書が有効な場合はTrue、そうでなければFalse。
     """
-    # Check expiration
+    # 有効期限をチェック
     now = datetime.utcnow()
     if now < cert.not_valid_before or now > cert.not_valid_after:
         return False
 
-    # Check signature if issuer certificate is provided
+    # 発行者証明書が提供された場合、署名をチェック
     if issuer_cert:
         try:
             issuer_cert.public_key().verify(
@@ -42,25 +41,25 @@ def validate_certificate(cert: x509.Certificate, issuer_cert: x509.Certificate =
 
 def cert_to_pem(cert: x509.Certificate) -> bytes:
     """
-    Converts a certificate object to PEM format.
+    証明書オブジェクトをPEM形式に変換します。
 
     Args:
-        cert: The certificate to convert.
+        cert: 変換する証明書。
 
     Returns:
-        The PEM-encoded certificate as bytes.
+        バイトとしてPEMエンコードされた証明書。
     """
     return cert.public_bytes(encoding=serialization.Encoding.PEM)
 
 def public_key_to_pem(pubkey) -> bytes:
     """
-    Converts a public key object to PEM format.
+    公開鍵オブジェクトをPEM形式に変換します。
 
     Args:
-        pubkey: The public key to convert (e.g., from cert.public_key()).
+        pubkey: 変換する公開鍵（例：cert.public_key()から）。
 
     Returns:
-        The PEM-encoded public key as bytes.
+        バイトとしてPEMエンコードされた公開鍵。
     """
     return pubkey.public_bytes(
         encoding=serialization.Encoding.PEM,

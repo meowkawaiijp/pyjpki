@@ -1,5 +1,5 @@
 """
-This module defines data structures for holding parsed certificate information.
+このモジュールは、解析された証明書情報を保持するためのデータ構造を定義します。
 """
 from dataclasses import dataclass
 from datetime import datetime
@@ -11,7 +11,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 @dataclass
 class JPKICertificate:
     """
-    A dataclass to hold parsed information from a JPKI certificate.
+    JPKI証明書から解析された情報を保持するデータクラス。
     """
     subject: Dict[str, str]
     issuer: Dict[str, str]
@@ -23,7 +23,7 @@ class JPKICertificate:
     @classmethod
     def from_cryptography(cls, cert: x509.Certificate):
         """
-        Creates a JPKICertificate instance from a cryptography Certificate object.
+        cryptographyのCertificateオブジェクトからJPKICertificateインスタンスを作成します。
         """
         subject = {attr.rfc4514_attribute_name: attr.value for attr in cert.subject}
         issuer = {attr.rfc4514_attribute_name: attr.value for attr in cert.issuer}

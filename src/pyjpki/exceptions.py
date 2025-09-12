@@ -1,14 +1,14 @@
 """
-Custom exceptions for the pyjpki library.
+pyjpkiライブラリ用のカスタム例外。
 """
 
 class JPKIError(Exception):
-    """Base exception class for all pyjpki errors."""
+    """すべてのpyjpkiエラーの基底例外クラス。"""
     pass
 
 class APDUError(JPKIError):
     """
-    Raised when an APDU command returns a non-9000 status word.
+    APDUコマンドが非9000ステータスワードを返したときに発生します。
     """
     def __init__(self, message, sw1, sw2):
         self.sw1 = sw1
@@ -17,7 +17,7 @@ class APDUError(JPKIError):
 
 class PinVerificationError(APDUError):
     """
-    Raised specifically when a PIN verification fails.
+    PIN検証が失敗したときに特に発生します。
     """
     def __init__(self, sw1, sw2):
         self.retries_left = sw2 & 0x0F if sw1 == 0x63 else 0

@@ -1,4 +1,4 @@
-# This file initializes the pyjpki package.
+# このファイルはpyjpkiパッケージを初期化します。
 __version__ = "0.1.0"
 
 from .card import CardManager
