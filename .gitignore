@@ -1,0 +1,37 @@
+#一般的なPython除外
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+*.egg-info/
+.env
+.venv
+sphinx/
+var/
+build/
+*-shm
+*-wal
+dist/
+.ruff_cache/
+# vscode等エディタ設定
+.vscode/
+.idea/
+target/
+Cargo.lock
+test/
+# Testing and coverage
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+coverage.xml
+*.cover
+# Development
+.env.local
+.env.*.local
+data/
+# Documentation
+doc/_build/
+*.log
