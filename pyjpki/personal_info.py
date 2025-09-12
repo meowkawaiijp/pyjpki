@@ -47,39 +47,55 @@ class JPKIPersonalInfo:
             gender=gender,
         )
 
-def _parse_tlv(data: bytes) -> Dict[bytes, bytes]:
-    """
-    個人属性データ構造用のシンプルなTLVパーサー。
-    """
-    parsed_data = {}
+def _parse_tlv_recursive(data: bytes):
+    """A recursive generator to parse TLV-encoded data."""
     i = 0
-    # コンテナヘッダー（FF 20）と長さをスキップ
-    # 調査に基づくと、実際のデータは最初の数バイト後に開始されます。
-    # 一般的なパターンは `FF 20 <length> DF 21 ...` のようなヘッダーです。
-    # 最初のタグ（DF 21）を見つけましょう
-    try:
-        header_start = data.index(bytes(TAG_HEADER))
-        i = header_start
-    except ValueError:
-        # ヘッダータグが見つからない場合、解析できません。
-        return {}
-
     while i < len(data):
-        # タグは1バイトまたは2バイト。この特定のデータでは2バイト（例：DF 21）
+        # In this specific JPKI context, tags are 2 bytes.
         tag = data[i:i+2]
         i += 2
 
-        # 長さは1バイトまたは2バイト
-        if data[i] & 0x80: # 長形式
-            len_bytes = data[i] & 0x7F
-            length = int.from_bytes(data[i+1:i+1+len_bytes], 'big')
-            i += 1 + len_bytes
-        else: # 短形式
-            length = data[i]
-            i += 1
+        if i >= len(data):
+            break
 
-        value = data[i:i+length]
-        parsed_data[tag] = value
+        # Length parsing (handles both short and long form)
+        length_byte = data[i]
+        i += 1
+        if length_byte & 0x80:
+            num_len_bytes = length_byte & 0x7F
+            if i + num_len_bytes > len(data):
+                break
+            length = int.from_bytes(data[i:i + num_len_bytes], 'big')
+            i += num_len_bytes
+        else:
+            length = length_byte
+
+        if i + length > len(data):
+            break
+
+        value = data[i:i + length]
+
+        # The container tag for the 4 basic attributes is DF 21.
+        # If we find it, we parse its content recursively.
+        if tag == bytes(TAG_HEADER):
+            yield from _parse_tlv_recursive(value)
+        else:
+            yield (tag, value)
+
         i += length
 
-    return parsed_data
+def _parse_tlv(data: bytes) -> Dict[bytes, bytes]:
+    """
+    A robust TLV parser for the personal attribute data structure.
+    It handles the outer container and uses a recursive parser for the content.
+    """
+    # According to research, the data may be wrapped in a container
+    # with a header like FF 20 <length>.
+    if data.startswith(b'\xFF\x20'):
+        container_len = data[2]
+        tlv_payload = data[3:3 + container_len]
+    else:
+        # If the header is not present, assume the data is the payload.
+        tlv_payload = data
+
+    return dict(_parse_tlv_recursive(tlv_payload))
