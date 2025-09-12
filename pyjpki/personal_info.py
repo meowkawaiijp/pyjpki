@@ -48,17 +48,17 @@ class JPKIPersonalInfo:
         )
 
 def _parse_tlv_recursive(data: bytes):
-    """A recursive generator to parse TLV-encoded data."""
+    """TLVエンコードされたデータを解析する再帰的ジェネレータ。"""
     i = 0
     while i < len(data):
-        # In this specific JPKI context, tags are 2 bytes.
+        # この特定のJPKIコンテキストでは、タグは2バイトです。
         tag = data[i:i+2]
         i += 2
 
         if i >= len(data):
             break
 
-        # Length parsing (handles both short and long form)
+        # 長さの解析（短形式と長形式の両方を処理）
         length_byte = data[i]
         i += 1
         if length_byte & 0x80:
@@ -75,8 +75,8 @@ def _parse_tlv_recursive(data: bytes):
 
         value = data[i:i + length]
 
-        # The container tag for the 4 basic attributes is DF 21.
-        # If we find it, we parse its content recursively.
+        # 4つの基本属性のコンテナタグはDF 21です。
+        # 見つけた場合、その内容を再帰的に解析します。
         if tag == bytes(TAG_HEADER):
             yield from _parse_tlv_recursive(value)
         else:
@@ -86,16 +86,16 @@ def _parse_tlv_recursive(data: bytes):
 
 def _parse_tlv(data: bytes) -> Dict[bytes, bytes]:
     """
-    A robust TLV parser for the personal attribute data structure.
-    It handles the outer container and uses a recursive parser for the content.
+    個人属性データ構造用のTLVパーサー。
+    外側のコンテナを処理し、内容には再帰的パーサーを使用します。
     """
-    # According to research, the data may be wrapped in a container
-    # with a header like FF 20 <length>.
+    # 研究によると、データはFF 20 <長さ>のようなヘッダーを持つ
+    # コンテナでラップされている可能性があります。
     if data.startswith(b'\xFF\x20'):
         container_len = data[2]
         tlv_payload = data[3:3 + container_len]
     else:
-        # If the header is not present, assume the data is the payload.
+        # ヘッダーが存在しない場合、データがペイロードであると仮定します。
         tlv_payload = data
 
     return dict(_parse_tlv_recursive(tlv_payload))
