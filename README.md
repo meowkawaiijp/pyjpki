@@ -125,6 +125,10 @@ with CardManager() as manager:
         print(f"PIN認証に失敗しました。残り試行回数: {e.retries_left}")
 ```
 
+### 参考: 例示コードの追加
+- 例として `examples/example.py`があります。カード接続、属性PIN認証、個人情報の読み取り、認証証明書の読み取り、データ署名の一連の動作をデモンストレーションします。
+- 実使用時には実カードとPINを適切に設定してください。詳細は `examples/example.py` をご確認ください。
+
 ### 個人情報の読み取り
 
 ```python
