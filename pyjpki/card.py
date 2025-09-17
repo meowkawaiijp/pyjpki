@@ -38,7 +38,7 @@ from .constants import (
     SW_VERIFY_FAIL_PREFIX,
     OID_SHA256,
 )
-from .exceptions import APDUError, PinVerificationError
+from .exceptions import APDUError, JPKIError, PinVerificationError
 
 
 logger = logging.getLogger(__name__)
@@ -252,6 +252,7 @@ class CardManager:
     def read_certificate(self, cert_type: str = "auth") -> x509.Certificate:
         """
         カードから証明書を読み取ります。
+        ファイルが256バイトより大きい場合でも、チャンクで読み取りを処理します。
         """
         if cert_type in self._cert_cache:
             return self._cert_cache[cert_type]
@@ -263,15 +264,49 @@ class CardManager:
         else:
             raise ValueError(f"Invalid cert_type: {cert_type}")
 
+        # 1. DF (JPKI) を選択
         apdu = [CLA_ISO7816, INS_SELECT, 0x04, 0x0C, len(DF_JPKI)] + DF_JPKI
         self._transmit(apdu)
 
+        # 2. EF (証明書ファイル) を選択
         apdu = [CLA_ISO7816, INS_SELECT, 0x02, 0x0C, len(ef)] + ef
         self._transmit(apdu)
 
-        apdu = [CLA_ISO7816, INS_READ_BINARY, 0x00, 0x00, 0x00]
-        cert_data, _, _ = self._transmit(apdu)
+        # 3. 証明書データをチャンクで読み取る
+        cert_data = bytearray()
+        offset = 0
+        chunk_size = 0xFF  # 255バイトが一般的な最大値
 
+        while True:
+            p1 = offset >> 8
+            p2 = offset & 0xFF
+            apdu = [CLA_ISO7816, INS_READ_BINARY, p1, p2, chunk_size]
+
+            try:
+                data, _, _ = self._transmit(apdu)
+
+                if not data:
+                    break  # データがなければ終了
+
+                cert_data.extend(data)
+                offset += len(data)
+
+                # カードが要求より少ないデータを返した場合、ファイルの終端に達した
+                if len(data) < chunk_size:
+                    break
+
+            except APDUError as e:
+                # 6B 00 はオフセットが範囲外であることを意味し、ファイルの終端に達したことを示す
+                if e.sw1 == 0x6B and e.sw2 == 0x00:
+                    break
+                else:
+                    # その他のAPDUエラーは再発生させる
+                    raise e
+
+        if not cert_data:
+            raise JPKIError("Failed to read any certificate data from the card.")
+
+        # 4. DERエンコードされた証明書をパース
         cert = x509.load_der_x509_certificate(bytes(cert_data), default_backend())
         self._cert_cache[cert_type] = cert
         return cert
