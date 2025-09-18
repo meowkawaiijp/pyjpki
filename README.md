@@ -151,3 +151,38 @@ with CardManager() as manager:
     except PinVerificationError as e:
         print(f"PIN認証に失敗しました。残り試行回数: {e.retries_left}")
 ```
+
+### 証明書チェーン検証の実用例
+
+PEM バンドルを用いた証明書チェーン検証の使い方を示します。 leaf 証明書と中間CA・ルートCAを PEM 形式で分けて持つ場合と、CA バンドルをそのまま読み込む場合の例を示します。
+
+```python
+from pyjpki import verify_certificate_chain, verify_certificate_chain_from_pem_bundle
+from cryptography import x509
+from cryptography.hazmat.backends import default_backend
+
+# 事前に leaf や中間CA、ルートCAを PEM ファイルとして保存していると仮定
+leaf_pem_path = "certs/leaf_cert.pem"
+inter1_pem_path = "certs/intermediate1.pem"
+root_pem_path = "certs/root.pem"
+
+with open(leaf_pem_path, "rb") as f:
+    leaf_pem = f.read()
+with open(inter1_pem_path, "rb") as f:
+    inter1_pem = f.read()
+with open(root_pem_path, "rb") as f:
+    root_pem = f.read()
+
+leaf_cert = x509.load_pem_x509_certificate(leaf_pem, backend=default_backend())
+inter1_cert = x509.load_pem_x509_certificate(inter1_pem, backend=default_backend())
+root_cert = x509.load_pem_x509_certificate(root_pem, backend=default_backend())
+
+# 1) chain 引数を使った検証
+chain = [inter1_cert, root_cert]
+print("verify_certificate_chain with chain:", verify_certificate_chain(leaf_cert, chain=chain))
+
+# 2) PEM バンドルを直接検証
+# leaf + inter1 + root の順で連結した PEM を bundle_pem として渡す
+bundle_pem = leaf_pem + inter1_pem + root_pem
+print("verify_certificate_chain_from_pem_bundle:", verify_certificate_chain_from_pem_bundle(bundle_pem, leaf_cert))
+```

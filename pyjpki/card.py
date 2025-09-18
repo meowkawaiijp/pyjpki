@@ -397,6 +397,18 @@ class CardManager:
             raise
         return bytes(data)
 
+    def sign_challenge(self, challenge: bytes) -> bytes:
+        """
+        チャレンジをカード上の秘密鍵で署名します。
+
+        Args:
+            challenge: 署名対象のチャレンジデータ。
+
+        Returns:
+            チャレンジの署名バイト列。
+        """
+        return self.sign_data(challenge, sign_type="auth")
+
     def read_personal_info(self):
         """
         カードから4つの基本個人属性を読み取ります。
