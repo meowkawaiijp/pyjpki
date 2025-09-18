@@ -64,7 +64,21 @@ def read_personal_info_action(manager: CardManager, logger: logging.Logger):
         logger.info(f"  性別: {info.gender}")
         logger.info("個人情報の読み取りが完了しました。")
     except Exception as e:
-        logger.error(f"個人情報の読み取り中にエラーが発生しました: {e}")
+        # APDU エラーで属性PINが必要になるケースを想定して再試行を試みる
+        if hasattr(e, 'sw1') and hasattr(e, 'sw2') and (e.sw1, e.sw2) == (0x69, 0x82):
+            try:
+                pin = getpass.getpass("属性PINを再入力してください: ")
+                manager.verify_pin(pin, pin_type="attr")
+                info = manager.read_personal_info()
+                logger.info(f"  氏名: {info.name}")
+                logger.info(f"  住所: {info.address}")
+                logger.info(f"  生年月日: {info.birth_date}")
+                logger.info(f"  性別: {info.gender}")
+                logger.info("個人情報の読み取りが完了しました。")
+            except Exception as e2:
+                logger.error(f"再試行中にエラーが発生しました: {e2}")
+        else:
+            logger.error(f"個人情報の読み取り中にエラーが発生しました: {e}")
 
 def read_certificate_action(manager: CardManager, logger: logging.Logger):
     """証明書情報を読み取り、表示する"""
