@@ -83,7 +83,18 @@ def sign_data_action(manager: CardManager, logger: logging.Logger):
     try:
         logger.info("デジタル署名の作成を開始します...")
         data_to_sign = b"This is a test message for digital signature."
-        signature = manager.sign_data(data_to_sign, sign_type="auth")
+        try:
+            signature = manager.sign_data(data_to_sign, sign_type="auth")
+        except Exception as e:
+            # PIN が必要なエラーの場合、ユーザーに PIN を入力して再試行
+            pin_needed = False
+            if isinstance(e, PinVerificationError):
+                pin_needed = True
+            if pin_needed or "PIN" in str(e):
+                pin = getpass.getpass("署名用PINを入力してください: ")
+                signature = manager.sign_data(data_to_sign, sign_type="auth", pin=pin)
+            else:
+                raise
         logger.info(f"  署名対象データ: {data_to_sign.decode()}")
         logger.info(f"  生成された署名（16進数）: {signature.hex()}")
         logger.info("デジタル署名の作成が完了しました。")

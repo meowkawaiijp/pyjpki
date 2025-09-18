@@ -11,10 +11,10 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from pyasn1.type import univ, namedtype, tag
 from pyasn1.codec.der import encoder as der_encoder
-from smartcard.System import readers
-from smartcard.pcsc.PCSCExceptions import BaseSCardException
-from smartcard.CardConnection import CardConnection
-from smartcard.reader.Reader import Reader
+from smartcard.System import readers # type: ignore
+from smartcard.pcsc.PCSCExceptions import BaseSCardException # type: ignore
+from smartcard.CardConnection import CardConnection # type: ignore
+from smartcard.reader.Reader import Reader # type: ignore
 
 
 from .constants import (
@@ -291,9 +291,7 @@ class CardManager:
                 cert_data.extend(data)
                 offset += len(data)
 
-                # カードが要求より少ないデータを返した場合、ファイルの終端に達した
-                if len(data) < chunk_size:
-                    break
+
 
             except APDUError as e:
                 # 6B 00 はオフセットが範囲外であることを意味し、ファイルの終端に達したことを示す
@@ -307,7 +305,18 @@ class CardManager:
             raise JPKIError("Failed to read any certificate data from the card.")
 
         # 4. DERエンコードされた証明書をパース
-        cert = x509.load_der_x509_certificate(bytes(cert_data), default_backend())
+        try:
+            cert = x509.load_der_x509_certificate(bytes(cert_data), default_backend())
+        except Exception:
+            # DERデータに余分なデータが含まれている可能性を拾うフォールバック
+            try:
+                from pyasn1.codec.der import decoder as der_decoder
+                from pyasn1.codec.der import encoder as der_encoder
+                first_obj, _ = der_decoder.decode(bytes(cert_data))  # decode first DER object
+                first_der_bytes = der_encoder.encode(first_obj)
+                cert = x509.load_der_x509_certificate(first_der_bytes, default_backend())
+            except Exception as e2:
+                raise JPKIError(f"Failed to parse certificate data: {e2}") from e2
         self._cert_cache[cert_type] = cert
         return cert
 
@@ -320,10 +329,18 @@ class CardManager:
         cert_obj = self.read_certificate(cert_type)
         return JPKICertificate.from_cryptography(cert_obj)
 
-    def sign_data(self, data_to_sign: bytes, sign_type: str = "auth") -> bytes:
+    def sign_data(self, data_to_sign: bytes, sign_type: str = "auth", pin: str = None) -> bytes:
         """
         カード上の秘密鍵を使用して、与えられたデータのハッシュに署名します。
+
+        Args:
+            data_to_sign: 署名するデータのバイト列。
+            sign_type: "auth" または "sign"。
+            pin: 署名時に必要なPIN。指定があれば検証を実行します。
         """
+        if pin is not None:
+            self.verify_pin(pin, pin_type=sign_type)
+        
         if sign_type == "auth":
             ef = EF_AUTH_KEY
         elif sign_type == "sign":
@@ -367,7 +384,17 @@ class CardManager:
             + [0x00]
         )
 
-        data, _, _ = self._transmit(apdu)
+        try:
+            data, _, _ = self._transmit(apdu)
+        except APDUError as e:
+            # 署名にはPINが必要なケースや、PIN検証エラーが原因で失敗するケースを明確化
+            if (e.sw1, e.sw2) in [(0x69, 0x82), (0x69, 0x83), (0x63, 0x00)]:
+                raise APDUError(
+                    "署名にはPINが必要な場合があります。sign_data(pin=...) を呼び出してPINを提供してください。",
+                    e.sw1,
+                    e.sw2,
+                )
+            raise
         return bytes(data)
 
     def read_personal_info(self):
