@@ -2,19 +2,20 @@
 このモジュールは、pyscardライブラリを使用してスマートカードリーダーと
 カードへの接続を管理するクラスを提供します。
 """
-from typing import List, Optional, Tuple
+
+from typing import Dict, List, Optional, Tuple
 
 import hashlib
 import logging
-from typing import List, Optional, Tuple
+import platform
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
-from pyasn1.type import univ, namedtype, tag
+from pyasn1.type import univ, namedtype
 from pyasn1.codec.der import encoder as der_encoder
-from smartcard.System import readers # type: ignore
-from smartcard.pcsc.PCSCExceptions import BaseSCardException # type: ignore
-from smartcard.CardConnection import CardConnection # type: ignore
-from smartcard.reader.Reader import Reader # type: ignore
+from smartcard.System import readers  # type: ignore
+from smartcard.pcsc.PCSCExceptions import BaseSCardException  # type: ignore
+from smartcard.CardConnection import CardConnection  # type: ignore
+from smartcard.reader.Reader import Reader  # type: ignore
 
 
 from .constants import (
@@ -61,7 +62,7 @@ class CardManager:
         self.reader_index = reader_index
         self._reader: Optional[Reader] = None
         self._connection: Optional[CardConnection] = None
-        self._cert_cache: dict = {}
+        self._cert_cache: Dict[str, x509.Certificate] = {}
         logger.info("CardManager initialized for reader index %d", reader_index)
 
     @staticmethod
@@ -77,8 +78,7 @@ class CardManager:
             if not reader_list:
                 logger.warning("No smart card readers found")
                 return []
-            
-            import platform
+
             if platform.system() == "Windows":
                 normalized_readers = []
                 for reader in reader_list:
@@ -90,11 +90,11 @@ class CardManager:
             else:
                 return [str(r) for r in reader_list]
                 
-        except BaseSCardException as e:
-            logger.error(f"Error getting smart card readers: {e}")
+        except BaseSCardException:
+            logger.exception("Error getting smart card readers")
             return []
-        except Exception as e:
-            logger.error(f"Unexpected error getting smart card readers: {e}")
+        except Exception:
+            logger.exception("Unexpected error getting smart card readers")
             return []
 
     def connect(self) -> None:
@@ -116,16 +116,16 @@ class CardManager:
             self._reader = reader_list[self.reader_index]
             logger.debug("Connecting to reader: %s", self._reader)
             self._connection = self._reader.createConnection()
-            
+
             self._connection.connect()
-          
+
             logger.info("Connected to card.")
-            
+
         except BaseSCardException as e:
-            logger.error(f"Smart card connection error: {e}")
+            logger.exception("Smart card connection error")
             raise RuntimeError(f"Failed to connect to smart card: {e}")
-        except Exception as e:
-            logger.error(f"Unexpected error during connection: {e}")
+        except Exception:
+            logger.exception("Unexpected error during connection")
             raise
 
     def disconnect(self) -> None:
@@ -171,30 +171,41 @@ class CardManager:
         """
         self.disconnect()
 
-    def _transmit(self, apdu: List[int]) -> Tuple[List[int], int, int]:
+    def _transmit(
+        self,
+        apdu: List[int],
+        *,
+        allow_verify_failure: bool = False,
+    ) -> Tuple[List[int], int, int]:
         """
         APDUコマンドを送信し、基本的なエラーチェックを処理します。
 
         Args:
             apdu: 送信するAPDUコマンド。
+            allow_verify_failure: True の場合、PIN 検証失敗 (0x63xx) を例外にせず呼び出し元に返す。
 
         Returns:
             (data, sw1, sw2)のタプル。
 
         Raises:
             APDUError: 送信が失敗した場合、またはカードが非成功ステータスワードを返した場合。
+            JPKIError: APDU送信時に低レベルエラーが発生した場合。
             RuntimeError: カードに接続されていない場合。
         """
         if not self.connection:
             raise RuntimeError("Not connected to a card.")
 
         logger.debug("--> %s", " ".join(f"{b:02X}" for b in apdu))
-        data, sw1, sw2 = self.connection.transmit(apdu)
+        try:
+            data, sw1, sw2 = self.connection.transmit(apdu)
+        except BaseSCardException as e:
+            logger.exception("Smart card transmit error")
+            raise JPKIError(f"Failed to transmit APDU: {e}") from e
         logger.debug("<-- %s (SW: %02X %02X)", " ".join(f"{b:02X}" for b in data), sw1, sw2)
 
         if (sw1, sw2) != SW_SUCCESS:
             # PIN検証失敗は別途処理される
-            if sw1 != SW_VERIFY_FAIL_PREFIX:
+            if not (allow_verify_failure and sw1 == SW_VERIFY_FAIL_PREFIX):
                 raise APDUError(f"APDU command failed: {apdu}", sw1, sw2)
         return data, sw1, sw2
 
@@ -238,9 +249,7 @@ class CardManager:
         pin_bytes = [ord(c) for c in pin]
         apdu = [CLA_ISO7816, INS_VERIFY, 0x00, 0x80, len(pin_bytes)] + pin_bytes
 
-        if not self.connection:
-            raise RuntimeError("Not connected to a card.")
-        data, sw1, sw2 = self.connection.transmit(apdu)
+        _, sw1, sw2 = self._transmit(apdu, allow_verify_failure=True)
 
         if (sw1, sw2) == SW_SUCCESS:
             return 3 # カウンターがリセットされるため、名目上の成功値。
