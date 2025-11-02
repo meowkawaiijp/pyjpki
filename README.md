@@ -1,6 +1,7 @@
 # pyjpki
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/meowkawaiijp/pyjpki)
 マイナンバーカードなどの日本の公的個人認証サービス（JPKI）スマートカードとやり取りするためのPythonモジュールです。
+
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/meowkawaiijp/pyjpki)
 
 ## 機能
 
