@@ -13,7 +13,11 @@ from cryptography.hazmat.backends import default_backend
 from pyasn1.type import univ, namedtype
 from pyasn1.codec.der import encoder as der_encoder
 from smartcard.System import readers  # type: ignore
-from smartcard.pcsc.PCSCExceptions import BaseSCardException  # type: ignore
+from smartcard.pcsc.PCSCExceptions import (
+    BaseSCardException,
+    EstablishContextException,  # type: ignore
+)  # type: ignore
+from smartcard.Exceptions import NoCardException  # type: ignore
 from smartcard.CardConnection import CardConnection  # type: ignore
 from smartcard.reader.Reader import Reader  # type: ignore
 
@@ -90,6 +94,18 @@ class CardManager:
             else:
                 return [str(r) for r in reader_list]
                 
+        except EstablishContextException as e:
+            error_msg = str(e)
+            if "Service not available" in error_msg or "0x8010001D" in error_msg:
+                logger.error(
+                    "PC/SCサービスが利用できません。Linux環境では以下のコマンドで"
+                    "pcscdサービスを起動してください:\n"
+                    "  sudo systemctl start pcscd\n"
+                    "  sudo systemctl enable pcscd"
+                )
+            else:
+                logger.exception("PC/SCコンテキストの確立に失敗しました")
+            return []
         except BaseSCardException:
             logger.exception("Error getting smart card readers")
             return []
@@ -121,6 +137,10 @@ class CardManager:
 
             logger.info("Connected to card.")
 
+        except NoCardException:
+            # カードが挿入されていない場合は、そのまま伝播する（呼び出し側で処理）
+            logger.debug("No card inserted in reader")
+            raise
         except BaseSCardException as e:
             logger.exception("Smart card connection error")
             raise RuntimeError(f"Failed to connect to smart card: {e}")

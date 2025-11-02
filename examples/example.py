@@ -3,8 +3,7 @@ import logging
 import time
 import sys
 import getpass
-
-from pyjpki import CardManager, PinVerificationError
+from pyjpki import CardManager, PinVerificationError, NoCardException
 
 
 def main() -> None:
@@ -44,8 +43,7 @@ def main() -> None:
                 # 正常に処理が完了したら、ループを抜けてスクリプトを終了
                 break
 
-        except RuntimeError:
-            # カードが挿入されていない場合、pyscardは接続エラーを発生させる
+        except (RuntimeError, NoCardException):
             logger.info("カードが挿入されていません。2秒後に再試行します。")
             time.sleep(2)
         except Exception as e:
